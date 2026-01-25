@@ -1,11 +1,7 @@
 from PySide6.QtWidgets import (QApplication,
-                               QWidget,
-                               QPushButton,
-                               QLabel,
                                QMainWindow,
-                               QGridLayout,
-                               QStackedWidget,
-                               QFileDialog)
+                               QStackedWidget
+                               )
 import sys
 
 from windows import GraphWindow
@@ -17,6 +13,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Practice Project")
         self.setMinimumWidth(1280)
         self.setMinimumHeight(720)
+
+        #self.setWindowIcon()
 
         self.window_stack = QStackedWidget()
         self.setCentralWidget(self.window_stack)

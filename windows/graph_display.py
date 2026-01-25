@@ -33,6 +33,7 @@ class ChartWorker(QObject):
 
     @Slot(list)
     def generate_graph(self, filters):
+
         temp_file = os.path.abspath("temp_chart.html")
         x_data, y_data, room = filters
         graph_df = self.df[self.df.Room == room]
@@ -63,8 +64,6 @@ class GraphWindow(QWidget):
         self.web.setHtml('<h1> Waiting for Data...</h1>')
         self.grid_layout.addWidget(self.web, 1, 0, 4, 5)
 
-        self.input_file = ""
-
         self._add_labels()
         self._add_buttons()
 
@@ -82,22 +81,23 @@ class GraphWindow(QWidget):
 
         self.chart_thread.start()
 
-    @Slot()
-    def start(self):
-        self.upload_file.emit(self.input_file)
-
     @Slot(list)
     def show_filters(self, filter_data):
+
         cols, rooms = filter_data
         self.web.setHtml('<h1> Select Graphing Data Above </h1>')
-        self.graph_button = QPushButton("Show Graph")
-        self.graph_button.setFixedHeight(25)
+
         self.x_value = QComboBox()
         self.x_value.addItems(cols)
+
         self.y_value = QComboBox()
         self.y_value.addItems(cols)
+
         self.room_value = QComboBox()
         self.room_value.addItems(rooms)
+
+        self.graph_button = QPushButton("Show Graph")
+        self.graph_button.setFixedHeight(25)
         self.graph_button.clicked.connect(
             lambda: self.request_graph.emit(
                 [
@@ -120,6 +120,7 @@ class GraphWindow(QWidget):
         self.grid_layout.addWidget(
             self.room_value, 0, 1, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
         )
+
     @Slot(str)
     def show_graph(self, temp_file):
         file = QUrl.fromLocalFile(temp_file)
@@ -134,8 +135,8 @@ class GraphWindow(QWidget):
             "Excel Files (*.xlsx *.xls);;All Files (*)"
         )
         if filename:
-            self.input_file = filename
-            self.input_file_label.setText(self.input_file)
+            self.upload_file.emit(filename)
+            self.input_file_label.setText(filename)
 
     def _add_labels(self):
 
@@ -150,21 +151,17 @@ class GraphWindow(QWidget):
 
         self.file_button = QPushButton("Select Excel File", self)
         self.file_button.clicked.connect(self._input_dialog)
-        self.upload_button = QPushButton("Upload File", self)
-        self.upload_button.clicked.connect(self.start)
 
         self.grid_layout.addWidget(
             self.file_button, 0, 4, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
-            )
-        self.grid_layout.addWidget(
-            self.upload_button, 0, 4, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
             )
  
     def cleanup(self):
         if self.chart_thread.isRunning():
             self.chart_thread.quit()
             self.chart_thread.wait()
-
+        if os.path.exists(os.path.abspath('temp_chart.html')):
+            os.remove(os.path.abspath('temp_chart.html'))
         
 
 

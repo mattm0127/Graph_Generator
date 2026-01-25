@@ -1,1 +1,1 @@
-from .home import GraphWindow
+from .graph_display import GraphWindow

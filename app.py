@@ -15,8 +15,6 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Practice Project")
-        self.setMaximumWidth(1920)
-        self.setMaximumHeight(1080)
         self.setMinimumWidth(1280)
         self.setMinimumHeight(720)
 

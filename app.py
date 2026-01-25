@@ -1,8 +1,13 @@
-from PySide6.QtWidgets import (QApplication,
-                               QMainWindow,
-                               QStackedWidget
-                               )
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QStackedWidget
+)
+from PySide6.QtGui import (
+    QIcon
+)
 import sys
+import os
 
 from windows import GraphWindow
 
@@ -10,11 +15,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Practice Project")
+        self.setWindowTitle("Data Visualizer")
         self.setMinimumWidth(1280)
         self.setMinimumHeight(720)
 
-        #self.setWindowIcon()
+        self.icon = QIcon()
+        self.icon.addFile(os.path.abspath('app_icon.png'))
+        self.setWindowIcon(self.icon)
 
         self.window_stack = QStackedWidget()
         self.setCentralWidget(self.window_stack)

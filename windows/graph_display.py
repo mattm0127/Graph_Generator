@@ -61,31 +61,52 @@ class GraphWindow(QWidget):
             self.grid_layout.setRowStretch(row, 1)
         
         self.web = QWebEngineView(self)
-        self.web.setHtml('<h1> Waiting for Data...</h1>')
+        self.web.setHtml('<h1 style="text-align: right">&#8593 Select a File</h1>')
         self.grid_layout.addWidget(self.web, 1, 0, 4, 5)
 
         self._add_labels()
         self._add_buttons()
 
-        self.start_worker()
+        self._start_worker()
 
-    def start_worker(self):
+    # Private Functions
+
+    def _start_worker(self):
         self.chart_thread = QThread()
         self.worker = ChartWorker()
         self.worker.moveToThread(self.chart_thread)
 
         self.upload_file.connect(self.worker.load_file)
-        self.worker.file_loaded.connect(self.show_filters)
+        self.worker.file_loaded.connect(self._show_filters)
         self.request_graph.connect(self.worker.generate_graph)
-        self.worker.result_ready.connect(self.show_graph)
+        self.worker.result_ready.connect(self._show_graph)
 
         self.chart_thread.start()
 
+    def _add_labels(self):
+
+        self.title_label = QLabel("Lets Generate!")
+        self.title_label.setStyleSheet("font-weight: bold;")
+
+        self.input_file_label = QLabel("Choose a file...", self)
+        self.grid_layout.addWidget(self.title_label, 0, 0, 1, 4, Qt.AlignmentFlag.AlignTop)
+        self.grid_layout.addWidget(self.input_file_label, 0, 4, Qt.AlignmentFlag.AlignTop)
+
+    def _add_buttons(self):
+
+        self.file_button = QPushButton("Select Excel File", self)
+        self.file_button.clicked.connect(self._input_dialog)
+
+        self.grid_layout.addWidget(
+            self.file_button, 0, 4, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
+            )
+    
+    # Private Slots
     @Slot(list)
-    def show_filters(self, filter_data):
+    def _show_filters(self, filter_data):
 
         cols, rooms = filter_data
-        self.web.setHtml('<h1> Select Graphing Data Above </h1>')
+        self.web.setHtml('<h1 style="text-align: left">Choose Your Data &#8593</h1>')
 
         self.x_value = QComboBox()
         self.x_value.addItems(cols)
@@ -122,7 +143,7 @@ class GraphWindow(QWidget):
         )
 
     @Slot(str)
-    def show_graph(self, temp_file):
+    def _show_graph(self, temp_file):
         file = QUrl.fromLocalFile(temp_file)
         self.web.load(file)
 
@@ -138,24 +159,7 @@ class GraphWindow(QWidget):
             self.upload_file.emit(filename)
             self.input_file_label.setText(filename)
 
-    def _add_labels(self):
-
-        self.title_label = QLabel("Lets Generate!")
-        self.title_label.setStyleSheet("font-weight: bold;")
-
-        self.input_file_label = QLabel("Choose a file...", self)
-        self.grid_layout.addWidget(self.title_label, 0, 0, 1, 4, Qt.AlignmentFlag.AlignTop)
-        self.grid_layout.addWidget(self.input_file_label, 0, 4, Qt.AlignmentFlag.AlignTop)
-
-    def _add_buttons(self):
-
-        self.file_button = QPushButton("Select Excel File", self)
-        self.file_button.clicked.connect(self._input_dialog)
-
-        self.grid_layout.addWidget(
-            self.file_button, 0, 4, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
-            )
- 
+    # Public Functions
     def cleanup(self):
         if self.chart_thread.isRunning():
             self.chart_thread.quit()

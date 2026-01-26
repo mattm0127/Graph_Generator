@@ -16,8 +16,8 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Data Visualizer")
-        self.setMinimumWidth(1280)
-        self.setMinimumHeight(720)
+        self.setMinimumWidth(960)
+        self.setMinimumHeight(480)
 
         self.icon = QIcon()
         self.icon.addFile(os.path.abspath('app_icon.png'))

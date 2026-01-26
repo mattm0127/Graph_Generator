@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (QWidget,
                                QLabel,
                                QGridLayout,
                                QFileDialog,
-                               QComboBox)
+                               QComboBox,
+                               QSizePolicy)
 from PySide6.QtCore import (Qt, 
                             QThread, 
                             QObject,
@@ -28,17 +29,21 @@ class ChartWorker(QObject):
     @Slot(str)
     def load_file(self, path):
         self.df = pd.read_excel(path)
-        filter_data = [self.df.columns, self.df.Room.unique()]
+        filter_data = self.df.columns
         self.file_loaded.emit(filter_data)
 
     @Slot(list)
     def generate_graph(self, filters):
 
-        temp_file = os.path.abspath("temp_chart.html")
-        x_data, y_data, room = filters
-        graph_df = self.df[self.df.Room == room]
-        fig = px.scatter(graph_df, x=x_data, y=y_data)
+        temp_file = os.path.abspath("temp_graph.html")
+        x_data, y_data, data_filter = filters
+        if data_filter:
+            fig = px.scatter(self.df, x=x_data, y=y_data, color=data_filter, title=y_data)
+            fig.update_layout(showlegend=True)
+        else:
+            fig = px.scatter(self.df, x=x_data, y=y_data, title=y_data)
         fig.write_html(temp_file, include_plotlyjs=True)
+
         self.result_ready.emit(temp_file)
 
 
@@ -102,51 +107,68 @@ class GraphWindow(QWidget):
     @Slot(list)
     def _show_filters(self, filter_data):
 
-        cols, rooms = filter_data
-        self.web.setHtml('<h1 style="text-align: left">Choose Your Data &#8593</h1>')
+        cols = filter_data
+        self.web.setHtml('<h1 style="text-align: left"> &#8593 Choose Your Data</h1>')
 
-        self.x_label = QLabel("X Axis: ", self)
+        self.x_label = QLabel("X Axis:", self)
         self.x_value = QComboBox(self)
-        self.x_value.addItem("Select X-Axis")
+        self.x_value.addItem("")
         self.x_value.addItems(cols)
 
-        self.y_label = QLabel("Y Axis: ", self)
+        self.y_label = QLabel("Y Axis:", self)
         self.y_value = QComboBox(self)
-        self.y_value.addItem("Select Y-Axis")
+        self.y_value.addItem("")
         self.y_value.addItems(cols)
 
-        self.room_value = QComboBox(self)
-        self.room_value.addItems(rooms)
+        self.data_label = QLabel("Select Data Filter:", self)
+        self.data_value = QComboBox(self)
+        self.data_value.addItem("")
+        self.data_value.addItems(cols)
+        self.data_value.currentIndexChanged.connect(
+            lambda: self.request_graph.emit(
+                [
+                    self.x_value.currentText(),
+                    self.y_value.currentText(),
+                    self.data_value.currentText()
+                ]
+            )
+        )
+
 
         self.graph_button = QPushButton("Show Graph", self)
+        self.graph_button.setMinimumHeight(50)
+        self.graph_button.setMinimumWidth(100)
         self.graph_button.clicked.connect(
             lambda: self.request_graph.emit(
                 [
                     self.x_value.currentText(), 
                     self.y_value.currentText(),
-                    self.room_value.currentText()
+                    self.data_value.currentText()
                 ]
             )
         )
 
         self.grid_layout.addWidget(
-            self.graph_button, 0, 2, Qt.AlignmentFlag.AlignCenter
-            )
-        self.grid_layout.addWidget(
             self.x_label, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
-        )
+        ) 
         self.grid_layout.addWidget(
-            self.x_value, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+            self.x_value, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter
         )
         self.grid_layout.addWidget(
             self.y_label, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
         )
         self.grid_layout.addWidget(
-            self.y_value, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
+            self.y_value, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
         )
         self.grid_layout.addWidget(
-            self.room_value, 0, 1, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
+            self.data_label, 0, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter
         )
+        self.grid_layout.addWidget(
+            self.data_value, 0, 1, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
+        )
+        self.grid_layout.addWidget(
+            self.graph_button, 0, 2, Qt.AlignmentFlag.AlignCenter
+            )
 
     @Slot(str)
     def _show_graph(self, temp_file):
@@ -164,6 +186,11 @@ class GraphWindow(QWidget):
         if filename:
             self.upload_file.emit(filename)
             self.input_file_label.setText(filename)
+    
+    @Slot()
+    def _validate_and_request_graph(self, x_val, y_val, data_f):
+        if not x_val and not y_val:
+            self.web.setHtml("<h1 style='text-align: left'>Select your X and Y Data</h1>")
 
     # Public Functions
 
@@ -171,8 +198,8 @@ class GraphWindow(QWidget):
         if self.chart_thread.isRunning():
             self.chart_thread.quit()
             self.chart_thread.wait()
-        if os.path.exists(os.path.abspath('temp_chart.html')):
-            os.remove(os.path.abspath('temp_chart.html'))
+        if os.path.exists(os.path.abspath('temp_graph.html')):
+            os.remove(os.path.abspath('temp_graph.html'))
         
 
 

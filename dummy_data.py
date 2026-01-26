@@ -27,7 +27,7 @@ for _  in range(500):
 
 # 4. Generate Status (Logic-based)
 # Let's say anything over 80.0 is an "Action Level" (Fail), otherwise "Pass"
-status_data = ['Fail' if v > 80 else 'Pass' for v in value_data]
+status_data = ['Fail' if v > 80 else 'Pass' for v in final_data]
 
 # 5. Create DataFrame
 df = pd.DataFrame({

@@ -35,16 +35,17 @@ class ChartWorker(QObject):
     @Slot(list)
     def generate_graph(self, filters):
 
-        temp_file = os.path.abspath("temp_graph.html")
+        
         x_data, y_data, data_filter = filters
+        fig = px.scatter(self.df, x=x_data, y=y_data, color=data_filter, title=y_data)
+        fig.update_layout(title_x=0.5)
         if data_filter:
-            fig = px.scatter(self.df, x=x_data, y=y_data, color=data_filter, title=y_data)
             fig.update_layout(showlegend=True)
-        else:
-            fig = px.scatter(self.df, x=x_data, y=y_data, title=y_data)
-        fig.write_html(temp_file, include_plotlyjs=True)
 
-        self.result_ready.emit(temp_file)
+        #temp_file = os.path.abspath("temp_graph.html")
+        #fig.write_html(temp_file)
+        html_str = fig.to_html(include_plotlyjs='cdn')
+        self.result_ready.emit(html_str)
 
 
 class GraphWindow(QWidget):
@@ -114,37 +115,35 @@ class GraphWindow(QWidget):
         self.x_value = QComboBox(self)
         self.x_value.addItem("")
         self.x_value.addItems(cols)
+        self.x_value.currentIndexChanged.connect(
+            lambda: self._validate_and_request_graph(
+                self.x_value.currentText(),
+                self.y_value.currentText(),
+                self.data_value.currentText()
+            )
+        )
 
         self.y_label = QLabel("Y Axis:", self)
         self.y_value = QComboBox(self)
         self.y_value.addItem("")
         self.y_value.addItems(cols)
+        self.y_value.currentIndexChanged.connect(
+            lambda: self._validate_and_request_graph(
+                self.x_value.currentText(),
+                self.y_value.currentText(),
+                self.data_value.currentText()
+            )
+        )
 
         self.data_label = QLabel("Select Data Filter:", self)
         self.data_value = QComboBox(self)
         self.data_value.addItem("")
         self.data_value.addItems(cols)
         self.data_value.currentIndexChanged.connect(
-            lambda: self.request_graph.emit(
-                [
-                    self.x_value.currentText(),
-                    self.y_value.currentText(),
-                    self.data_value.currentText()
-                ]
-            )
-        )
-
-
-        self.graph_button = QPushButton("Show Graph", self)
-        self.graph_button.setMinimumHeight(50)
-        self.graph_button.setMinimumWidth(100)
-        self.graph_button.clicked.connect(
-            lambda: self.request_graph.emit(
-                [
-                    self.x_value.currentText(), 
-                    self.y_value.currentText(),
-                    self.data_value.currentText()
-                ]
+            lambda: self._validate_and_request_graph(
+                self.x_value.currentText(),
+                self.y_value.currentText(),
+                self.data_value.currentText()
             )
         )
 
@@ -166,14 +165,12 @@ class GraphWindow(QWidget):
         self.grid_layout.addWidget(
             self.data_value, 0, 1, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
         )
-        self.grid_layout.addWidget(
-            self.graph_button, 0, 2, Qt.AlignmentFlag.AlignCenter
-            )
 
     @Slot(str)
-    def _show_graph(self, temp_file):
-        file = QUrl.fromLocalFile(temp_file)
-        self.web.load(file)
+    def _show_graph(self, html_str):
+        #file = QUrl.fromLocalFile(temp_file)
+        #self.web.load(file)
+        self.web.setHtml(html_str)
 
     @Slot()
     def _input_dialog(self):
@@ -189,8 +186,22 @@ class GraphWindow(QWidget):
     
     @Slot()
     def _validate_and_request_graph(self, x_val, y_val, data_f):
-        if not x_val and not y_val:
-            self.web.setHtml("<h1 style='text-align: left'>Select your X and Y Data</h1>")
+        if x_val and y_val:
+            if not data_f:
+                data_f = None
+            self.request_graph.emit(
+                [
+                    x_val,
+                    y_val,
+                    data_f
+                ]
+            )
+            self.web.setHtml("<h4 style='text-align: left'>Loading Graph...</h4>")
+        elif x_val or y_val:
+            if data_f:
+                self.web.setHtml("<h1 style='text-align: left'>&#8593 Choose X and Y</h1>")
+        else:
+            self.web.setHtml("<h1 style='text-align: left'>&#8593 Choose X and Y</h1>")
 
     # Public Functions
 

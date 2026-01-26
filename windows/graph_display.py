@@ -85,11 +85,7 @@ class GraphWindow(QWidget):
 
     def _add_labels(self):
 
-        self.title_label = QLabel("Lets Generate!")
-        self.title_label.setStyleSheet("font-weight: bold;")
-
         self.input_file_label = QLabel("Choose a file...", self)
-        self.grid_layout.addWidget(self.title_label, 0, 0, 1, 4, Qt.AlignmentFlag.AlignTop)
         self.grid_layout.addWidget(self.input_file_label, 0, 4, Qt.AlignmentFlag.AlignTop)
 
     def _add_buttons(self):
@@ -102,23 +98,27 @@ class GraphWindow(QWidget):
             )
     
     # Private Slots
+
     @Slot(list)
     def _show_filters(self, filter_data):
 
         cols, rooms = filter_data
         self.web.setHtml('<h1 style="text-align: left">Choose Your Data &#8593</h1>')
 
-        self.x_value = QComboBox()
+        self.x_label = QLabel("X Axis: ", self)
+        self.x_value = QComboBox(self)
+        self.x_value.addItem("Select X-Axis")
         self.x_value.addItems(cols)
 
-        self.y_value = QComboBox()
+        self.y_label = QLabel("Y Axis: ", self)
+        self.y_value = QComboBox(self)
+        self.y_value.addItem("Select Y-Axis")
         self.y_value.addItems(cols)
 
-        self.room_value = QComboBox()
+        self.room_value = QComboBox(self)
         self.room_value.addItems(rooms)
 
-        self.graph_button = QPushButton("Show Graph")
-        self.graph_button.setFixedHeight(25)
+        self.graph_button = QPushButton("Show Graph", self)
         self.graph_button.clicked.connect(
             lambda: self.request_graph.emit(
                 [
@@ -130,10 +130,16 @@ class GraphWindow(QWidget):
         )
 
         self.grid_layout.addWidget(
-            self.graph_button, 0, 2, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter
+            self.graph_button, 0, 2, Qt.AlignmentFlag.AlignCenter
             )
         self.grid_layout.addWidget(
-            self.x_value, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
+            self.x_label, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+        )
+        self.grid_layout.addWidget(
+            self.x_value, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+        )
+        self.grid_layout.addWidget(
+            self.y_label, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft
         )
         self.grid_layout.addWidget(
             self.y_value, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
@@ -160,6 +166,7 @@ class GraphWindow(QWidget):
             self.input_file_label.setText(filename)
 
     # Public Functions
+
     def cleanup(self):
         if self.chart_thread.isRunning():
             self.chart_thread.quit()

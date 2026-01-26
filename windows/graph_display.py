@@ -236,7 +236,7 @@ class GraphWindow(QWidget):
         )
         if filename:
             self.upload_file.emit(filename)
-            self.input_file_label.setText(filename)
+            self.input_file_label.setText(filename.split('/')[-1])
 
     @Slot()
     def _validate_and_request_graph(self, x_val, y_val, data_f):

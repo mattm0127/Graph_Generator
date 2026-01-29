@@ -41,6 +41,14 @@ class ChartWorker(QObject):
                 self.df_sheet_dict = {
                     self.filetype: pd.read_csv(path, sep=None, engine='python')
                 }
+        
+        empty_sheets = []
+        for key, value in self.df_sheet_dict.items():
+            if len(value) == 0:
+                empty_sheets.append(key)
+        for sheet in empty_sheets:
+            self.df_sheet_dict.pop(sheet)
+
         sheet_names = list(self.df_sheet_dict.keys())
         # Get the data for the Window filters
         #! Update this to clean data and return better filtering data
@@ -48,7 +56,6 @@ class ChartWorker(QObject):
             self.df_sheet_dict[sheet_names[0]].columns,
             sheet_names
         ]
-
         # Send the filter data back to the Window
         self.file_loaded.emit(filter_data)
 
@@ -68,7 +75,6 @@ class ChartWorker(QObject):
         fig.update_layout(title_x=0.5)
         if label_data:
             fig.update_layout(showlegend=True)
-
         # Create the HTML string and output
         html_str = fig.to_html(include_plotlyjs="cdn")
         self.result_ready.emit(html_str)
@@ -79,7 +85,6 @@ class ChartWorker(QObject):
 
     @Slot(str)
     def generate_new_filters(self, new_sheet):
-        print(new_sheet)
         df = self.df_sheet_dict[new_sheet]
         filters = [df.columns, None]
         self.file_loaded.emit(filters)
@@ -164,7 +169,6 @@ class GraphWindow(QWidget):
         #! CHANGE THIS ALL. MOVE CREATION AND UPDATING VALUES TO DIFFERENT FUNCTIONS TO NOT REDRAW OVER PREVIOS BUTTONS/INPUTS
         # Currently only the columns come as filterable data
         cols, sheet_names = filter_data
-        print(cols)
         self.web.setHtml("<h1 style='text-indent: 10%''> &#8593 Choose Your Data</h1>")
         if sheet_names:
             self.sheet_label = QLabel("Select Sheet", self)

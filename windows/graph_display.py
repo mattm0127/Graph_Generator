@@ -2,7 +2,6 @@ import os
 
 import pandas as pd
 import plotly.express as px
-import openpyxl as opx
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -22,7 +21,8 @@ class ChartWorker(QObject):
 
     def __init__(self):
         super().__init__()
-        self.df: pd.DataFrame = None
+        self.df_sheet_dict = None
+        self.filetype:str = None
 
     @Slot(str)
     def load_file(self, path):
@@ -33,16 +33,21 @@ class ChartWorker(QObject):
         """
 
         # Read File into DataFrame
-        filetype = path.split('.')[-1]
-        match filetype:
+        self.filetype = path.split('.')[-1]
+        match self.filetype:
             case "xlsx" | "xls":
-                self.df = pd.read_excel(path, sheet_name=None)
+                self.df_sheet_dict = pd.read_excel(path, sheet_name=None)
             case "csv":
-                self.df = pd.read_csv(path, sep=None, engine='python')
-
+                self.df_sheet_dict = {
+                    self.filetype: pd.read_csv(path, sep=None, engine='python')
+                }
+        sheet_names = list(self.df_sheet_dict.keys())
         # Get the data for the Window filters
         #! Update this to clean data and return better filtering data
-        filter_data = self.df.columns
+        filter_data = [
+            self.df_sheet_dict[sheet_names[0]].columns,
+            sheet_names
+        ]
 
         # Send the filter data back to the Window
         self.file_loaded.emit(filter_data)
@@ -52,16 +57,16 @@ class ChartWorker(QObject):
         """Generate the html string to display the graph in the Window.
 
         Args:
-            filters (list): Cleaned List containing x axis, y axis and data_filter
+            filters (list): Cleaned List containing x axis, y axis and label_data
         """
 
         # Unpack the list
-        x_data, y_data, data_filter = filters
-
+        x_data, y_data, label_data, sheet_name = filters
+        df = self.df_sheet_dict[sheet_name]
         # Create the graph and layout
-        fig = px.scatter(self.df, x=x_data, y=y_data, color=data_filter, title=y_data)
+        fig = px.scatter(df, x=x_data, y=y_data, color=label_data, title=y_data)
         fig.update_layout(title_x=0.5)
-        if data_filter:
+        if label_data:
             fig.update_layout(showlegend=True)
 
         # Create the HTML string and output
@@ -72,26 +77,34 @@ class ChartWorker(QObject):
         # temp_file = os.path.abspath("temp_graph.html")
         # fig.write_html(temp_file)
 
+    @Slot(str)
+    def generate_new_filters(self, new_sheet):
+        print(new_sheet)
+        df = self.df_sheet_dict[new_sheet]
+        filters = [df.columns, None]
+        self.file_loaded.emit(filters)
+
 
 class GraphWindow(QWidget):
     upload_file = Signal(str)
     request_graph = Signal(list)
+    request_filters = Signal(str)
 
     def __init__(self):
         super().__init__()
 
         self.grid_layout = QGridLayout(self)
-        for col in range(5):
+        for col in range(6):
             self.grid_layout.setColumnStretch(col, 1)
-        for row in range(5):
+        for row in range(6):
             if row == 0:
                 self.grid_layout.setRowMinimumHeight(row, 50)
                 continue
             self.grid_layout.setRowStretch(row, 1)
 
         self.web = QWebEngineView(self)
-        self.web.setHtml('<h1 style="text-align: right">&#8593 Select a File</h1>')
-        self.grid_layout.addWidget(self.web, 1, 0, 4, 5)
+        self.web.setHtml('<h1 style="text-align: right">Select a File &#8593</h1>')
+        self.grid_layout.addWidget(self.web, 1, 0, 5, 6)
 
         self._add_labels()
         self._add_buttons()
@@ -112,6 +125,7 @@ class GraphWindow(QWidget):
 
         # Connect the signals
         self.upload_file.connect(self.worker.load_file)
+        self.request_filters.connect(self.worker.generate_new_filters)
         self.worker.file_loaded.connect(self._show_filters)
         self.request_graph.connect(self.worker.generate_graph)
         self.worker.result_ready.connect(self._show_graph)
@@ -123,7 +137,7 @@ class GraphWindow(QWidget):
         """Add the initial labels to the WIndow"""
         self.input_file_label = QLabel("Choose a file...", self)
         self.grid_layout.addWidget(
-            self.input_file_label, 0, 4, Qt.AlignmentFlag.AlignTop
+            self.input_file_label, 0, 5, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
         )
 
     def _add_buttons(self):
@@ -134,8 +148,8 @@ class GraphWindow(QWidget):
         self.grid_layout.addWidget(
             self.file_button,
             0,
-            4,
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
+            5,
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight,
         )
 
     # Private Slots
@@ -147,80 +161,106 @@ class GraphWindow(QWidget):
         Args:
             filter_data (list): List of data to be used as filters
         """
-
+        #! CHANGE THIS ALL. MOVE CREATION AND UPDATING VALUES TO DIFFERENT FUNCTIONS TO NOT REDRAW OVER PREVIOS BUTTONS/INPUTS
         # Currently only the columns come as filterable data
-        cols = filter_data
+        cols, sheet_names = filter_data
+        print(cols)
         self.web.setHtml("<h1 style='text-indent: 10%''> &#8593 Choose Your Data</h1>")
+        if sheet_names:
+            self.sheet_label = QLabel("Select Sheet", self)
+            self.sheet_value = QComboBox(self)
+            self.grid_layout.addWidget(
+                self.sheet_label,
+                0,
+                4,
+                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter,
+            )
+            self.grid_layout.addWidget(
+                self.sheet_value,
+                0,
+                4,
+                Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
+            )
+            self.sheet_value.addItems(sheet_names)
+            self.sheet_value.currentIndexChanged.connect(
+                lambda: self._change_sheet_value(self.sheet_value.currentText())
+            )
 
         # Set up all of the filtering specific buttons and labels
-        self.x_label = QLabel("X Axis:", self)
-        self.x_value = QComboBox(self)
+        if not hasattr(self, 'x_label'):
+            self.x_label = QLabel("X Axis:", self)
+            self.x_value = QComboBox(self)
+            self.grid_layout.addWidget(
+                self.x_label, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+            )
+            self.grid_layout.addWidget(
+            self.x_value, 0, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+            )
         self.x_value.addItem("")
         self.x_value.addItems(cols)
         self.x_value.currentIndexChanged.connect(
             lambda: self._validate_and_request_graph(
                 self.x_value.currentText(),
                 self.y_value.currentText(),
-                self.data_value.currentText(),
+                self.label_value.currentText(),
+                self.sheet_value.currentText()
             )
         )
-
-        self.y_label = QLabel("Y Axis:", self)
-        self.y_value = QComboBox(self)
+        if not hasattr(self, 'y_label'):
+            self.y_label = QLabel("Y Axis:", self)
+            self.y_value = QComboBox(self)
+            self.grid_layout.addWidget(
+                self.y_label,
+                0,
+                0,
+                Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight,
+            )
+            self.grid_layout.addWidget(
+                self.y_value,
+                0,
+                1,
+                Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
+            )
         self.y_value.addItem("")
         self.y_value.addItems(cols)
         self.y_value.currentIndexChanged.connect(
             lambda: self._validate_and_request_graph(
                 self.x_value.currentText(),
                 self.y_value.currentText(),
-                self.data_value.currentText(),
+                self.label_value.currentText(),
+                self.sheet_value.currentText()
             )
         )
 
-        self.data_label = QLabel("Select Data Filter:", self)
-        self.data_value = QComboBox(self)
-        self.data_value.addItem("")
-        self.data_value.addItems(cols)
-        self.data_value.currentIndexChanged.connect(
+        if not hasattr(self, 'data_label'):
+            self.data_label = QLabel("Select Label:", self)
+            self.label_value = QComboBox(self)
+            self.grid_layout.addWidget(
+                self.data_label,
+                0,
+                2,
+                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+            )
+            self.grid_layout.addWidget(
+                self.label_value,
+                0,
+                2,
+                Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
+            )
+        self.label_value.addItem("")
+        self.label_value.addItems(cols)
+        self.label_value.currentIndexChanged.connect(
             lambda: self._validate_and_request_graph(
                 self.x_value.currentText(),
                 self.y_value.currentText(),
-                self.data_value.currentText(),
+                self.label_value.currentText(),
+                self.sheet_value.currentText()
             )
         )
 
-        # Apply all filter Widgets to the grid
-        self.grid_layout.addWidget(
-            self.x_label, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
-        )
-        self.grid_layout.addWidget(
-            self.x_value, 0, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
-        )
-        self.grid_layout.addWidget(
-            self.y_label,
-            0,
-            0,
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight,
-        )
-        self.grid_layout.addWidget(
-            self.y_value,
-            0,
-            1,
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
-        )
-        self.grid_layout.addWidget(
-            self.data_label,
-            0,
-            2,
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
-        )
-        self.grid_layout.addWidget(
-            self.data_value,
-            0,
-            2,
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
-        )
-
+        #Add Sheets Widgets
+        
+       
     @Slot(str)
     def _show_graph(self, html_str):
         """Display the graph on the WebView
@@ -246,7 +286,7 @@ class GraphWindow(QWidget):
             self.input_file_label.setText(filename.split('/')[-1])
 
     @Slot()
-    def _validate_and_request_graph(self, x_val, y_val, data_f):
+    def _validate_and_request_graph(self, x_val, y_val, label_val, sheet_val):
         """Check the inputs of the filter data and requests graph if valid
 
         Args:
@@ -254,18 +294,26 @@ class GraphWindow(QWidget):
             y_val (str): Y Axis value
             data_f (str): Data to color the points by
         """
-        if x_val and y_val:
-            if not data_f:
-                data_f = None
-            self.request_graph.emit([x_val, y_val, data_f])
+        if x_val and y_val and sheet_val:
+            if not label_val:
+                label_val = None
+            self.request_graph.emit([x_val, y_val, label_val, sheet_val])
             self.web.setHtml("<h4 style='text-align: center'>Loading Graph...</h4>")
         elif x_val or y_val:
-            if data_f:
+            if label_val:
                 self.web.setHtml(
                     "<h1 style='text-indent: 10%'>&#8593 Choose X and Y</h1>"
                 )
         else:
             self.web.setHtml("<h1 style='text-indent: 10%'>&#8593 Choose X and Y</h1>")
+
+    @Slot()
+    def _change_sheet_value(self, new_sheet):
+        self.x_value.clear()
+        self.y_value.clear()
+        self.label_value.clear()
+        self.request_filters.emit(new_sheet)
+        
 
     # Public Functions
 

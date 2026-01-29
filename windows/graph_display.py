@@ -2,6 +2,8 @@ import os
 
 import pandas as pd
 import plotly.express as px
+import openpyxl as opx
+
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
@@ -31,7 +33,12 @@ class ChartWorker(QObject):
         """
 
         # Read File into DataFrame
-        self.df = pd.read_excel(path)
+        filetype = path.split('.')[-1]
+        match filetype:
+            case "xlsx" | "xls":
+                self.df = pd.read_excel(path, sheet_name=None)
+            case "csv":
+                self.df = pd.read_csv(path, sep=None, engine='python')
 
         # Get the data for the Window filters
         #! Update this to clean data and return better filtering data
@@ -230,9 +237,9 @@ class GraphWindow(QWidget):
         """Opens the input dialog for the data file"""
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose Excel File...",
+            "Choose File...",
             "",
-            "Excel Files (*.xlsx *.xls);;All Files (*)",
+            "Excel (*.xlsx *.xls);;CSV (*.csv);;All Files (*)",
         )
         if filename:
             self.upload_file.emit(filename)

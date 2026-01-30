@@ -147,7 +147,7 @@ class GraphWindow(QWidget):
 
     def _add_buttons(self):
         """Add the initial buttons the the Window"""
-        self.file_button = QPushButton("Select Excel File", self)
+        self.file_button = QPushButton("Select File", self)
         self.file_button.clicked.connect(self._input_dialog)
 
         self.grid_layout.addWidget(
